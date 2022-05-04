@@ -11,12 +11,12 @@ from datetime import datetime
 from pprint import pprint
 from stix.core import mongo_db as db
 from stix.core import datatypes as sdt
-from stix.spice import datetime
+from stix.spice import time_utils as ut
 from stix.analysis import ql_analyzer as qla
 
 
 mdb = db.MongoDB()
-EBINS = [0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 25, 28, 32, 36, 40, 45, 50, 56, 63, 70, 76, 84, 100, 120, 150, 'Emax']
+EBINS = [0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 25, 28, 32, 36, 40, 45, 50, 56, 63, 70, 76, 84, 100, 120, 150, math.inf]
 def get_energy_bins(emask):
     ebins=[]
     for i in range(32):
@@ -46,8 +46,8 @@ def get_lightcurve_data(start_utc, end_utc, sort_field='header.unix_time'):
 
         sort_field (str, optional): [description]. Defaults to 'header.unix_time'.
     """
-    start_unix=datetime.utc2unix(start_utc)
-    duration=datetime.utc2unix(end_utc)-start_unix
+    start_unix=ut.utc2unix(start_utc)
+    duration=ut.utc2unix(end_utc)-start_unix
     packets=mdb.get_LC_pkt_by_tw(
             start_unix,
             duration)
@@ -55,12 +55,12 @@ def get_lightcurve_data(start_utc, end_utc, sort_field='header.unix_time'):
 
 
 
-def plot_lc_and_save(folder, _id, event_name, start_utc, end_utc,  overwrite=True, peak_utc=None, light_time=0, event_type="Flare #"):
+def plot_lc_and_save(folder, _id, event_name, start_utc, end_utc,  overwrite=True, hvline=None, light_time=0, event_type="Flare #"):
     key='stixlc'
     if  mdb.get_flare_pipeline_products(_id, key) and overwrite == False:
         print(f'{event_type}{event_name} STIX LCs were not created!')
         return 
-    fig,ax=plot_lc(start_utc, end_utc,peak_utc, light_time, event_type, event_name)
+    fig,ax=plot_lc(start_utc, end_utc,hvline, light_time, event_type, event_name)
     #fig.tight_layout()
     if not fig:
         return None
@@ -71,45 +71,47 @@ def plot_lc_and_save(folder, _id, event_name, start_utc, end_utc,  overwrite=Tru
     mdb.update_flare_pipeline_products(_id, key, [filename])
     return filename
 
-def plot_lc(start_utc, end_utc, peak_utc=None, light_time=0, event_type='', event_name='', ax=None):
+def plot_lc(start_utc, end_utc, fill_between_times=[], light_time=0, event_type='', event_name='', ax=None):
+    print("Plotting LC for time range:", start_utc, end_utc)
     data=get_lightcurve_data(start_utc, end_utc)
     if data['num']==0:
 
         print('No LC data')
         return None, None
-    earth_dt = [datetime.unix2datetime(x+light_time) for x in  data['time']]
-    min_cnts=0
-    max_cnts=0
+    earth_dt = [ut.unix2datetime(x+light_time) for x in  data['time']]
     if ax is None:
         fig, ax = plt.subplots(figsize=(12,6))
     else:
         fig=plt.gcf()
 
-
-
     for i,lc in data['lcs'].items():
         ax.plot(earth_dt, lc, label=data['energy_bins']['names'][i])
-        max_lc_cnt=np.max(lc)
-        min_lc_cnt=np.min(lc)
-        if max_lc_cnt>max_cnts:
-            max_cnts=max_lc_cnt
-        if min_lc_cnt<min_cnts:
-            min_cnts=min_lc_cnt
 
-    if peak_utc:
-        peak_dt=datetime.utc2datetime(peak_utc)
-        ax.vlines(peak_dt,min_cnts, max_cnts, linestyle='dotted')
+    if fill_between_times:
+        dts=[ut.utc2datetime(x) for x in fill_between_times]
+        if len(dts):
+            ax.axvspan(dts[0], dts[1], alpha=0.5, color='cyan')
+
     locator = mdates.AutoDateLocator(minticks=3, maxticks=7)
     formatter = mdates.ConciseDateFormatter(locator)
     ax.xaxis.set_major_locator(locator)
     ax.xaxis.set_major_formatter(formatter)
-    ax.set_xlabel(f'S/C UTC + {light_time:.02f} s')
-    ax.set_ylabel('Counts / 4 s')
-    title=f'STIX QL LCs ({event_type}{event_name})'
+    xlabel=f'UTC + {light_time:.02f} s (4 sec time bins)' if light_time!=0 else 'UTC (4 sec time bins)'
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel('Counts')
+    title=f'STIX QL Light Curves'
     ax.set_title(title)
     ax.set_yscale('log')
     ax.legend(loc='upper right')
     return fig, ax
+def plot_QL_lc_for_bsd(bsd_id, fill_between_times=[], ax=None):
+    bsd_db=mdb.get_collection('bsd')
+    doc=bsd_db.find_one({'_id':bsd_id}, {'start_unix':1, 'end_unix':1})
+    try:
+        plot_lc(ut.unix2utc(doc['start_unix']), ut.unix2utc(doc['end_unix']), fill_between_times, ax=ax)
+    except (TypeError, KeyError, ValueError):
+        print(f'Failed to plot light curve for {bsd_id}')
+
 
 
 if __name__=='__main__':
