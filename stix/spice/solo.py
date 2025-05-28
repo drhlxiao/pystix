@@ -591,8 +591,9 @@ class SoloEphemeris(object):
 
         et = sp.datetime2et(dt)
         sc = sp.sce2c(SOLAR_ORBITER_ID, et) #convert to clock ticks
-        #tol=sp.sctiks(int(sc), "1:000")
+        #tol=sp.sctiks(int(sc), "00:02:00")
         tol= 1.0
+
         #cmat, sc= sp.ckgp(SOLAR_ORBITER_SRF_FRAME_ID, sc, tol, 'SOLO_ECLIP_NORM')
         #cmat, sc= sp.ckgp(SOLAR_ORBITER_SRF_FRAME_ID, sc, tol, 'SOLO_EQUAT_NORM')
         frame_id=SOLAR_ORBITER_SRF_FRAME_ID if frame1=='SOLO_SRF' else SOLAR_ORBITER_STIX_ILS_FRAME_ID
@@ -643,6 +644,12 @@ class SoloEphemeris(object):
         res={'unix_time':valid_t,'roll': euler_angles[0],'pitch': euler_angles[1],'yaw': euler_angles[2],'error':'',
                 'frame1':frame1, 'ref_frame':ref_frame, 'units':'deg'}
         return res
+
+    
+
+
+
+
     @staticmethod
     def to_stix_frame(rtn_coord, cmat):
         """

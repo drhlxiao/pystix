@@ -109,6 +109,8 @@ class MongoDB(object):
     def get_aspect_solutions(self, start_unix, end_unix):
         return self.collection_aspect.find({'unix_time':{'$gte':start_unix,'$lte':end_unix}}).sort('unix_time',1)
 
+
+
     
     def get_last_att_in_time(self, start_unix, end_unix):
         pass
@@ -160,9 +162,10 @@ class MongoDB(object):
         query_string = {
                 'unix_time': {
                     '$lt': stop_unix, '$gt': start_unix
-                },
-                'satellite':satellite
+                }
+                #'satellite':satellite
             }
+
         return  self.col_goes.find(query_string).sort('unix_time', 1)
 
     def get_houskeeping_packets_of_file(self,file_id):
@@ -431,6 +434,9 @@ class MongoDB(object):
                 'hidden': hidden,
                 'published': False
             }
+
+
+
             for key in result:
                 if isinstance(result[key], list):
                     if len(result[key]) == result['num_peaks']:

@@ -96,6 +96,9 @@ def process_file(file_id):
     unix_time = data['time']  # set to the center of a bin
     configs = get_rotating_buffer_config(unix_time[-1], unix_time[0])
     #print(data['lcs'])
+    print("Config:")
+    print(configs)
+    #print("start, end:", time_utils.unix2utc(unix_time[-1]), time_utils.unix2utc(unix_time[0] ))
     lightcurve =np.sum([v for k,v in data['lcs'].items()] ,axis=0)
     #sum counts of all energy bands
     triggers=data['triggers']
@@ -140,8 +143,14 @@ def process_file(file_id):
             trig_sum+=tr
         else:
             #estimated sub-time bins
-            num_tbins = math.ceil(c / thr)
-            max_bins = math.ceil(4. / min_tbin)
+            #num_tbins = math.ceil(c / thr)
+            #max_bins = math.ceil(4. / min_tbin)
+
+            # replaced with the following code on 6 Nov. 2024, by Hualin Xiao
+            # to fix the wrong estimated min bins issue when the onboard time-bins = 3 
+            num_tbins = round(c / thr, 2)
+            max_bins = round(4. / min_tbin,2)
+
             num_tbins = max(num_tbins,1)
             num_tbins = min(max_bins, num_tbins) #can not greater than the maximum time bins
             tbin = round(4. / num_tbins, 1)  # time step 0.1s

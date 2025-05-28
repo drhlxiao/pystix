@@ -30,6 +30,7 @@ from stix.analysis import flare_goes_class as fgc
 from stix.analysis import goes_downloader as gdl
 from stix.analysis import service_5_analyzer  as  ser5a
 from stix.analysis import correct_qlc_with_att as cql
+from stix.analysis import sci_size
 from stix.flare_pipeline import imaging_task_manager as itm
 from stix.pipeline import task_manager 
 
@@ -54,7 +55,8 @@ task_list={'calibration':True,
         'bsd_l1_preprocessing':False,
         'imaging':True,
         'bkg_estimation':True,
-        'correct_qlc_with_att':True
+        'correct_qlc_with_att':True,
+           'calc_sci_size':True
         }
         
 
@@ -304,6 +306,11 @@ def piepeline_parsing_and_basic_analysis(instrument, filename, notification_enab
                 calibration.process_one_run(run_id,create_pdf=True, pdf_path=report_path)
         except Exception as e:
             logger.error(str(e))
+    if task_list['calc_sci_size']:
+        logger.info('calculate science real size...')
+        sci_size.process_file(file_id)
+
+
 
     clear_ngnix_cache()
     return file_id

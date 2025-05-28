@@ -28,8 +28,12 @@ logger = logger.get_logger()
 mdb = db.MongoDB()
 fits_db = mdb.get_collection('fits')
 
-DEFAULT_ASP_PATH_PATTEN = "/data/pub099/fits/L2/*/*/*/*/*aux*.fits"
-DATA_ARCHIVE_FITS_PATHS = ["/data/pub099/fits/L1","/data/pub099/fits/L2"]
+DEFAULT_ASP_PATH_PATTENS = [
+        "/data/pub099/fits/ANC/*/*/*/ASP/*-asp-*.fits",
+        "/data/pub099/fits/L2/*/*/*/*/*aux*.fits"
+                            ] 
+
+DATA_ARCHIVE_FITS_PATHS = ["/data/pub099/fits/ANC", "/data/pub099/fits/L1","/data/pub099/fits/L2"]
 processed_list = []
 
 DATA_ARCHIVE_FILE_INFO = {
@@ -45,6 +49,7 @@ DATA_ARCHIVE_FILE_INFO = {
     'L1_stix-sci-xray-spec': ('xray-spec', 'L1', 'science', 54143),
     'L1_stix-sci-aspect-burst': ('aspect', 'L1', 'auxiliary', 54125),
     'L2_stix-aux-': ('auxiliary', 'L2', 'auxiliary', 54102),
+    'solo_ANC_stix-asp-': ('auxiliary', 'L2', 'auxiliary', 54102),
     'ql-ql-tmstatusflarelist':('ql-flarelist','L1','quicklook', 54122)
     #'L2_stix-hk-maxi': ('hk_maxi', 'L2', 'housekeeping', 54102)
 }
@@ -153,10 +158,13 @@ def import_data_archive_products_from_path(path, max_age_days=2):
             logger.info(
                 f'{basename} ({md5checksum}) already inserted in the database')
             continue
+        logger.info(
+                f'{basename}  will be inserted in the database')
 
 
 
-        logger.info(f'Add {basename} to fits file database')
+
+        logger.info(f'Adding {basename} to fits file database')
         meta = read_data_archive_fits_meta(fname,
                                            DATA_ARCHIVE_FILE_INFO[file_type])
         if meta:
@@ -180,25 +188,25 @@ def import_data_archive_products_from_path(path, max_age_days=2):
             #fits_db.update_one({'md5': md5checksum}, {'$set': meta},
             #                   upsert=True)
             #update if
-        if 'L2_stix-aux-' in fname:
+        if 'L2_stix-aux-' in fname or 'solo_ANC_stix-asp-' in fname:
             import_auxiliary(fname)
 
 
-def import_all_aspect_solutions(path_patten=DEFAULT_ASP_PATH_PATTEN):
+def import_all_aspect_solutions(path_pattens=DEFAULT_ASP_PATH_PATTENS):
     """
         Import all aspect solutions to database
     """
-
-    for fname in glob.iglob(path_patten):
-        if fname not in processed_list:
-            import_auxiliary(fname)
-            processed_list.append(fname)
-            #reduce checking of database
+    for path_patten in path_pattens:
+        for fname in glob.iglob(path_patten):
+            if fname not in processed_list:
+                import_auxiliary(fname)
+                processed_list.append(fname)
+                #reduce checking of database
 
 
 def read_aux_fits_to_dict(fname, md5):
     """
-    read fits file and convert data to dict
+        read fits file and convert data to dict
     """
     hdul = fits.open(fname)
     data = hdul['DATA'].data
@@ -251,7 +259,7 @@ def import_auxiliary(fname):
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:
-        import_data_archive_products(max_age_days=10)
+        import_data_archive_products(max_age_days=4)
     elif len(sys.argv) != 2:
         #default
         logger.info('read_and_import_aspect <filename')

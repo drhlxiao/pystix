@@ -6,6 +6,8 @@
    - store results in the flare list database
 """
 import numpy as np
+import sys
+sys.path.append('.')
 from stix.core import mongo_db as db
 from stix.spice import time_utils
 from stix.utils import bson
@@ -100,11 +102,41 @@ def goes_flux_to_class(x, frac=True):
     else:
         return f'X{x/1e-4:.1f}' if frac else f'X{x/1e-4:.0f}'
 
+def flat_goes_data(data):
+    fluxes= {}
+    sat_ids = set()
+    for d in data:
+        unix = d['unix_time']
+        satellite = int(d['satellite'])
+        bkg=d.get('background',0)
+        sat_ids.add(satellite)
+        if satellite not in fluxes:
+            fluxes[satellite]={}
+
+        if d['energy'] not in fluxes[satellite]:
+            fluxes[satellite][d['energy']] = {'flux':[],'unix':[],'bkg':[]}
+                #time_tags[d['energy']]=[]
+        fluxes[satellite][d['energy']]['flux'].append(d['flux'])
+        fluxes[satellite][d['energy']]['unix'].append(unix)
+        fluxes[satellite][d['energy']]['bkg'].append(bkg)
+    fluxes['sat_ids']=sat_ids
+
+    return fluxes
 
 def get_goes_info(start, end):
     """
     """
-    data = mdb.get_goes_fluxes(start, end, satellite=16)
+    if end-start<120:
+        end = start+120
+    raw = mdb.get_goes_fluxes(start, end)
+    fluxes = flat_goes_data(raw)
+    if not fluxes['sat_ids']:
+        return None
+    stat=min(fluxes['sat_ids'])
+    #we already select the 
+
+    data = fluxes[stat]
+
     last_time = 0
     start_times = []
     low_name = '0.1-0.8nm'
@@ -115,17 +147,25 @@ def get_goes_info(start, end):
     peak_time_high = 0
     bkg_low = 0
 
-    for d in data:
-        unix = d['unix_time']
-        flux = d['flux']
-        if d['energy'] == low_name and flux > peak_flux_low:
-            peak_flux_low = flux
-            peak_time_low = unix
-            bkg_low = d.get('background', 0)
+    high_unix = data[high_name]['unix']
+    high_flux = data[high_name]['flux']
+    high_bkg= data[high_name]['bkg']
 
-        if d['energy'] == high_name and flux > peak_flux_high:
-            peak_flux_high = flux
-            peak_time_high = unix
+    low_unix = data[low_name]['unix']
+    low_flux = data[low_name]['flux']
+    low_bkg= data[low_name]['bkg']
+
+    for flux,unix,bkg in zip(high_flux, high_unix,high_bkg):
+        if flux > peak_flux_high:
+            peak_flux_high= flux
+            peak_time_high= unix
+            bkg_high= bkg
+
+    for flux,unix,bkg in zip(low_flux, low_unix,low_bkg):
+        if flux > peak_flux_low:
+            peak_flux_low= flux
+            peak_time_low= unix
+            bkg_low= bkg
 
     goes_class = goes_flux_to_class(peak_flux_low)
     return (peak_time_low, peak_flux_low, peak_time_high, peak_flux_high,
@@ -141,7 +181,10 @@ def find_goes_class_flares_in_file(file_id):
         return
     goes_class_list = []
     for doc in flares:
-        peak_utc, goes_class, goes_estimated = get_flare_goes_class(doc)
+        try:
+            peak_utc, goes_class, goes_estimated = get_flare_goes_class(doc)
+        except:
+            continue
         if peak_utc is None:
             continue
 
@@ -222,7 +265,11 @@ def compute_flare_goes_for_flares(id_start, id_end):
         return
     goes_class_list = []
     for doc in flares:
-        peak_utc, goes_class, goes_estimated = get_flare_goes_class(doc)
+        try:
+            peak_utc, goes_class, goes_estimated = get_flare_goes_class(doc)
+        except Exception as e:
+            #print(e)
+            continue
         if peak_utc is None:
             continue
         goes_class_list.append((peak_utc, goes_class, goes_estimated))
@@ -266,7 +313,8 @@ def get_flare_goes_class(doc):
     except (KeyError, IndexError):
         delta_lt = 0
     peak_time_low, peak_flux_low, peak_time_high, peak_flux_high, goes_class, bkg_low = get_goes_info(
-        start_unix + delta_lt, end_unix + delta_lt)
+            start_unix + delta_lt, end_unix + delta_lt)
+
     bkg_subtracted_counts = peak_counts - doc['LC_statistics']['lc0'][
         'bkg_median']
     estimated_class, estimated_flux = estimate_goes_class(bkg_subtracted_counts, dsun,
@@ -294,6 +342,7 @@ def get_flare_goes_class(doc):
         },
         'ephemeris': eph,
     }
+    #print(updated_data)
     flare_db.update_one({'_id': doc['_id']}, {'$set': updated_data})
     return time_utils.unix2utc(peak_time_low), goes_class, estimated_class
 

@@ -333,6 +333,10 @@ class StixBulkL1L2Analyzer(object):
                 stat['hash_excluded'] += 1
                 continue
             hash_list.append(pkt['hash'])
+            packet_type=pkt['header']['SPID']
+            if packet_type not in [54115, 54116]:
+                logger.warning(f'Packet type invalid: {packet_type}')
+                continue
 
             if pkt['header']['unix_time'] < last_header_time:
                 logger.info('time stamp rolling back, ignore')

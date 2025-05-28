@@ -436,6 +436,7 @@ class StixSciencePacketAnalyzer(object):
         self.db_bsd_forms = mdb.get_collection('data_requests')
         self.last_unique_id = -1
         self.last_request_spid = -1
+        #self.total_size = 0
         self.packet_ids = []
         self.start_time = 0
         self.report={}
@@ -507,6 +508,7 @@ class StixSciencePacketAnalyzer(object):
                 if not updated_existing:
                     self.current_id+=1
                 self.report={}
+                #self.total_size = 0
                 self.packet_ids = []
             #else:
             #    self.bsd_db.save(self.report)
@@ -550,6 +552,7 @@ class StixSciencePacketAnalyzer(object):
                 'start_scet': start,
                 'unique_id': unique_id,
                 'run_id': run_id,
+                #'total_size': self.total_size,
                 'SPID': packet['SPID'],
                 'name': DATA_REQUEST_REPORT_NAME[packet['SPID']],
                 'header_unix_time': packet['unix_time'],
@@ -562,6 +565,7 @@ class StixSciencePacketAnalyzer(object):
         if packet['seg_flag'] in [2, 3]:
             self.report['last_pkt']= packet_id
         self.packet_ids.append(packet_id)
+        #self.total_size += packet['header'].get('raw_length',0)
         self.last_unique_id = unique_id
         self.last_request_spid = packet['SPID']
 

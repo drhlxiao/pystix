@@ -70,6 +70,7 @@ def correct_lc_lowest_energy_counts(times, counts):
     att_in_times=[]
     for doc in docs:
         start, end = doc['time'][0], doc['time'][-1]
+        #unix time
         att_in_times.append((start,end))
 
 
@@ -545,13 +546,17 @@ def find_flares_in_data(data,
                                 unix_time[H50_res[3].astype(int)])).T
     # calculate peak width at 50% of the maximum count
 
+    att_in = [any(t[0] < pk_time < t[1] for t in att_in_times) for pk_time in peak_unix_times.tolist()]
+
+
 
     doc = {
         'num_peaks': xpeaks.size,
         'peak_unix_time': peak_unix_times.tolist(),
         'peak_counts': peak_values.tolist(),
         'peak_utc': peaks_utc,
-        'att_in': bool(att_in_times),
+        'att_in': att_in,
+        'att_in_time_range': att_in_times,
         'flare_id': flare_ids,
         'baseline': baseline,
         'threshold': threshold,
