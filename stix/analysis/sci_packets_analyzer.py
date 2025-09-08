@@ -783,7 +783,7 @@ def process_remaining_requests():
     for doc in docs:
         print(f"Processing:{doc['_id']} ...")
         try:
-            process_science_request_doc(doc)
+            process_science_request_doc(doc, force=True)
         except IndexError:
             continue
 
@@ -815,7 +815,7 @@ def reprocess_all_spectrograms():
             continue
 
 
-def process_science_request_doc(doc):
+def process_science_request_doc(doc, force = False):
     """
     process science data request report
     """
@@ -826,7 +826,7 @@ def process_science_request_doc(doc):
         return
 
     logger.info(f'processing bsd id: {doc["_id"]}, spid:{spid}')
-    if 'first_pkt' not in doc or 'last_pkt' not in doc:
+    if ('first_pkt' not in doc or 'last_pkt' not in doc) and not force:
         # don't process incomplete packets
         # wait until
         # complete report

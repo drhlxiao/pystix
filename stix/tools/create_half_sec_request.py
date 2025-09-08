@@ -13,25 +13,45 @@ from stix.core import logger
 from stix.core import config
 mdb = db.MongoDB()
 
+def create_req(_id, start_unix, duration ):
+    start_utc = sdt.unix2utc(start_unix)
+    end_unix=start_unix+duration
+    end_utc = sdt.unix2utc(end_unix)
+    form={
+    "_id" : _id,
+    "email" : "bot@stix",
+    "flare_id" : "-1",
+    "data_volume" : "0",
+    "data_volume_upper_limit" : "0",
+    "username" : "",
+    "execution_date" : "",
+    "author" : "bot",
+    "subject" : "IOR 374: 40s top only",
+    "purpose" : "Solar Flare",
+    "request_type" : "L1",
+    "start_utc" :start_utc, 
+    "duration" : str(duration),
+    "time_bin" : "40",
+    "detector_mask" : "0xFFF8E2FF",
+    "pixel_mask" : "0xF",
+    "emin" : "1",
+    "emax" : "17",
+    "eunit" : "1",
+    "scaling_factor" : "0",
+    "priority" : "1",
+    "description" : "",
+    "volume" : -1,
+    "start_unix" : start_unix,
+    "end_unix" : end_unix,
+    "end_utc" : end_utc,
+    "creation_time" : datetime.now()
+    "status" : 0,
+    "hidden" : False,
+    "reviewers" : "Hualin Xiao",
+    }
+    
 def run():
-    start_id=4201
+    start_id=66552
+    for 
     db= mdb.get_collection('data_requests')
-    docs= db.find({'start_utc':{'$gt': '2021-09-06T13:11:08'}, 'request_type':'Spectrogram','time_bin':'1'})
-    for doc in docs:
-        print('find ', doc['_id'])
-        doc['_id']=start_id
-        doc['data_volume']=0
-        doc['subject']='Half sec. request, '+doc['subject']
-        doc['data_volume_upper_limit']=0
-        doc['time_bin']=0.5
-        doc['description']+=f'. Similar to Request # {doc["unique_ids"]} except time bin changed from 1 sec to 0.5 sec'
-        doc['unique_ids']=[]
-        print(doc)
-        start_id+=1
-        db.insert_one(doc)
-
-
-
-
-if __name__ == '__main__':
-    run()
+    db.insert_one(form)
