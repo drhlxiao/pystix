@@ -3,6 +3,7 @@ PADRE Data Crawler and MongoDB Integration
 Crawls PADRE MEDDEA spectrum data and stores it in MongoDB
 """
 
+import pickle
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from dateutil.relativedelta import relativedelta
@@ -18,7 +19,10 @@ import sys
 
 # Add PADRE MEDDEA to path
 sys.path.append('/home/xiaohl/FHNW/STIX/PADRE/padre_meddea/')
+sys.path.append('/opt/stix/padre/padre_meddea/')
 from padre_meddea.io import read_file
+
+DOWNLOAD_DIR = '/data/padre'
 def unix2datetime(t):
     dt=pd.to_datetime(t, unit='s', utc=True).to_pydatetime()
     return dt.replace(microsecond=int(dt.microsecond))
@@ -271,7 +275,7 @@ class PADRECrawler:
             print(f"Error downloading {url}: {e}")
             return False
     
-    def parse_and_write_to_mongo(self, filename, file_url=None, download_dir='/tmp/padre_data'):
+    def parse_and_write_to_mongo(self, filename, file_url=None, download_dir= DOWNLOAD_DIR):
         """
         Parse PADRE file and write to MongoDB if not already present
         
@@ -326,17 +330,22 @@ class PADRECrawler:
                 "timestamp": datetime.utcnow(),
                 "times": times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist(),
                 "spectrogram": im.value.tolist() if hasattr(im, 'value') else im.tolist(),
-                "time_start": unix2datetime(times[0].unix) if hasattr(times[0], 'unix') else times[0],
-                "time_end": unix2datetime(times[-1].unix) if hasattr(times[-1], 'unix') else times[-1],
+                "time_start": times[0].unix if hasattr(times[0], 'unix') else times[0],
+                "time_end": times[-1].unix if hasattr(times[-1], 'unix') else times[-1],
             }
+
+            
             
             # Insert into MongoDB
             self.db.insert_one(doc)
             print(f"Successfully inserted {base_filename} into MongoDB")
-            
+            doc["times"] = times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist()
+            doc["spectrogram"] = im.value.tolist() if hasattr(im, 'value') else im.tolist()
+
+
             # Clean up downloaded file if needed
-            if should_cleanup:
-                os.remove(local_path)
+            #if should_cleanup:
+            #os.remove(local_path)
             
             return True
             
@@ -404,7 +413,7 @@ class PADRECrawler:
         return stats
 
 
-def main():
+def main(nmon=2):
     """Main function to run the PADRE crawler"""
     print("PADRE Data Crawler and MongoDB Integration")
     print("=" * 50)
@@ -413,7 +422,7 @@ def main():
     crawler = PADRECrawler()
     
     # Crawl recent data and update MongoDB
-    stats = crawler.crawl_recent_and_parse(nmon=2)
+    stats = crawler.crawl_recent_and_parse(nmon)
     
     print("\nCrawl Statistics:")
     print(f"  Total files found: {stats['total_files']}")
