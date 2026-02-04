@@ -10,7 +10,7 @@ from pymongo import MongoClient
 # MongoDB connection
 client = MongoClient('mongodb://localhost:27017/')  # Adjust connection string as needed
 db = client['stix']
-collection = db['goes']
+collection = db['goes_fluxes']
 
 # Time range
 tstart = datetime.strptime("2025-07-31 07:06", "%Y-%m-%d %H:%M")
@@ -34,7 +34,7 @@ while current_start < tend:
                    current_end.strftime("%Y-%m-%d %H:%M")), 
             a.Instrument("XRS"), 
             a.goes.SatelliteNumber(18), 
-            a.Resolution('flx1s')
+            a.Resolution('avg1m')
         )
         
         if len(result[0]) > 0:
