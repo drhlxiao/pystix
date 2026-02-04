@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta
 import pymongo
 import requests
 import numpy as np
+import os
 import pandas as pd
 from datetime import datetime, date
 from dateutil import parser as dtparser
@@ -233,35 +234,12 @@ class PADRECrawler:
         return im, times
     
     def file_exists_in_mongo(self, filename):
-        """
-        Check if a file already exists in MongoDB
-        
-        Parameters:
-        -----------
-        filename : str
-            Filename to check
-            
-        Returns:
-        --------
-        bool : True if file exists, False otherwise
-        """
-        return self.db.find_one({"filename": filename}) is not None
+
+        filename_no_ext = os.path.splitext(filename)[0]
+        return self.db.find_one({"filename": filename_no_ext}) is not None
     
     def download_file(self, url, local_path):
-        """
-        Download a file from URL to local path
-        
-        Parameters:
-        -----------
-        url : str
-            URL to download from
-        local_path : str
-            Local path to save file to
-            
-        Returns:
-        --------
-        bool : True if successful, False otherwise
-        """
+
         try:
             print(f"Downloading {url}...")
             r = self.session.get(url, timeout=30)
@@ -276,24 +254,7 @@ class PADRECrawler:
             return False
     
     def parse_and_write_to_mongo(self, filename, file_url=None, download_dir= DOWNLOAD_DIR):
-        """
-        Parse PADRE file and write to MongoDB if not already present
-        
-        Parameters:
-        -----------
-        filename : str
-            Filename or path to PADRE file
-        file_url : str, optional
-            URL of the file (will download if provided and file not local)
-        download_dir : str
-            Directory to download files to if needed
-            
-        Returns:
-        --------
-        bool : True if written, False if already exists or error
-        """
-        import os
-        
+
         # Extract just the filename for MongoDB lookup
         base_filename = os.path.basename(filename)
         
@@ -323,13 +284,14 @@ class PADRECrawler:
             hdu = read_file(local_path)
             im, times = self.parse_raw_spectrum(hdu)
             
+            base_filename_no_ext = os.path.splitext(base_filename)[0]
             # Prepare document for MongoDB
             doc = {
-                "filename": base_filename,
+                "filename": base_filename_no_ext,
                 "url": file_url,
-                "timestamp": datetime.utcnow(),
-                "times": times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist(),
-                "spectrogram": im.value.tolist() if hasattr(im, 'value') else im.tolist(),
+                "creation_time": datetime.now(),
+                #"times": times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist(),
+                #"spectrogram": im.value.tolist() if hasattr(im, 'value') else im.tolist(),
                 "time_start": times[0].unix if hasattr(times[0], 'unix') else times[0],
                 "time_end": times[-1].unix if hasattr(times[-1], 'unix') else times[-1],
             }
@@ -341,11 +303,15 @@ class PADRECrawler:
             print(f"Successfully inserted {base_filename} into MongoDB")
             doc["times"] = times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist()
             doc["spectrogram"] = im.value.tolist() if hasattr(im, 'value') else im.tolist()
+            pkl_fname = os.path.join(download_dir, base_filename_no_ext+'.pkl')
+            print(pkl_fname)
+            with open(pkl_fname,'wb') as f:
+                pickle.dump(doc,f)
 
 
             # Clean up downloaded file if needed
-            #if should_cleanup:
-            #os.remove(local_path)
+            if should_cleanup:
+                os.remove(local_path)
             
             return True
             
@@ -358,7 +324,7 @@ class PADRECrawler:
             
             return False
     
-    def crawl_recent_and_parse(self, nmon=2, download_dir='/tmp/padre_data'):
+    def crawl_recent_and_parse(self, nmon=2, download_dir=DOWNLOAD_DIR):
         """
         Crawl recent PADRE data and write to MongoDB if not already present
         

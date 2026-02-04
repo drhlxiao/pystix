@@ -1,0 +1,7 @@
+#!/usr/bin/python3
+import sys
+sys.path.append('/opt/stix/pystix')
+sys.path.append('.')
+from stix.data_imports import padre_crawler as pc
+if  __name__ == '__main__':
+    pc.main(nmon=2)
