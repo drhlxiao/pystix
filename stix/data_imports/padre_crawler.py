@@ -3,6 +3,7 @@ PADRE Data Crawler and MongoDB Integration
 Crawls PADRE MEDDEA spectrum data and stores it in MongoDB
 """
 
+import sys
 import pickle
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -301,8 +302,15 @@ class PADRECrawler:
             # Insert into MongoDB
             self.db.insert_one(doc)
             print(f"Successfully inserted {base_filename} into MongoDB")
-            doc["times"] = times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist()
-            doc["spectrogram"] = im.value.tolist() if hasattr(im, 'value') else im.tolist()
+            _times = times[:].unix.tolist() if hasattr(times[:], 'unix') else times.tolist()
+            tstart = _times[0]
+            doc['tstart'] = tstart
+            doc["times"]  = [round(x -tstart,2) for x in _times]
+            dmatrix = im.value if hasattr(im, 'value') else im
+            doc["spectrogram"] = [
+                [round(v, 3) if v != 0 else 0 for v in row] 
+                for row in dmatrix
+            ]
             pkl_fname = os.path.join(download_dir, base_filename_no_ext+'.pkl')
             print(pkl_fname)
             with open(pkl_fname,'wb') as f:
@@ -399,4 +407,6 @@ def main(nmon=2):
 
 
 if __name__ == "__main__":
-    main()
+    months = int(sys.argv[1]) if len(sys.argv) > 1 else 2
+    main(months)
+        
