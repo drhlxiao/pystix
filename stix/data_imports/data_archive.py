@@ -30,10 +30,11 @@ fits_db = mdb.get_collection('fits')
 
 DEFAULT_ASP_PATH_PATTENS = [
         "/data/pub099/fits/ANC/*/*/*/ASP/*-asp-*.fits",
-        "/data/pub099/fits/L2/*/*/*/*/*aux*.fits"
+        "/data/pub099/fits/L2/*/*/*/*/*aux*.fits",
                             ] 
 
-DATA_ARCHIVE_FITS_PATHS = ["/data/pub099/fits/ANC", "/data/pub099/fits/L1","/data/pub099/fits/L2"]
+DATA_ARCHIVE_FITS_PATHS = ["/data/pub099/fits/ANC", "/data/pub099/fits/L1","/data/pub099/fits/L2",
+                           '/data/pub099/fits/CAL']
 processed_list = []
 
 DATA_ARCHIVE_FILE_INFO = {
@@ -50,6 +51,7 @@ DATA_ARCHIVE_FILE_INFO = {
     'L1_stix-sci-aspect-burst': ('aspect', 'L1', 'auxiliary', 54125),
     'L2_stix-aux-': ('auxiliary', 'L2', 'auxiliary', 54102),
     'solo_ANC_stix-asp-': ('auxiliary', 'L2', 'auxiliary', 54102),
+    'solo_CAL_stix': ('ql-cal', 'L2', 'quicklook', 54124),
     'ql-ql-tmstatusflarelist':('ql-flarelist','L1','quicklook', 54122)
     #'L2_stix-hk-maxi': ('hk_maxi', 'L2', 'housekeeping', 54102)
 }
@@ -190,6 +192,8 @@ def import_data_archive_products_from_path(path, max_age_days=2):
             #update if
         if 'L2_stix-aux-' in fname or 'solo_ANC_stix-asp-' in fname:
             import_auxiliary(fname)
+        #if 'solo-CAL_stix-cal-' in fname :
+        #    import_l2_calibration(fname)
 
 
 def import_all_aspect_solutions(path_pattens=DEFAULT_ASP_PATH_PATTENS):
@@ -238,6 +242,9 @@ def read_aux_fits_to_dict(fname, md5):
             continue
         res.append(row)
     return bson.dict_to_json(res)
+
+
+
 
 
 def import_auxiliary(fname):

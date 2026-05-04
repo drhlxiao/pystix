@@ -21,6 +21,7 @@ from stix.spice import time_utils
 from stix.core import logger
 from stix.spice import solo
 from stix.analysis import ql_analyzer as qla
+from datetime import datetime
 
 logger = logger.get_logger()
 
@@ -32,37 +33,44 @@ default_rot_threshold=1800
 #rotation buffer configuration
 
 
-def get_rotating_buffer_config(max_time, min_time=None):
+#def get_rotating_buffer_config(max_time, min_time=None):
+def get_rotating_buffer_config(end_unix_time, start_unix_time=None):
+
     rot_config={312: [], 313: [], 314:[]}
     config_db= mdb.get_collection('config')
 
-    if not min_time:
-        min_time=max_time
+    if not start_unix_time:
+        start_unix_time= end_unix_time
 
 
 
     for _id in rot_config.keys():
-        # First Query
+        # First Query, find the last config cmd
         query1 = {
             'type': 'asw',
             'parameter': _id,
-            'execution_unix': { '$lte': min_time }
+            'execution_unix': { '$lte': start_unix_time}
         }
+        print(query1)
 
         result1 = config_db.find(query1).sort('execution_unix', -1).limit(1)
 
         # Second Query
+        #find if any such command executed within the time range of the file
         query2 = {
             'type': 'asw',
             'parameter': _id,
-            'execution_unix': { '$gte': min_time, '$lte': max_time }
+            'execution_unix': { '$gte': start_unix_time, '$lte': end_unix_time}
         }
+        print(query2)
 
         result2 = config_db.find(query2)
 
         # Combine Results
         rows= list(result1) + list(result2)
         for row in rows:
+            #print(row)
+            
             rot_config[_id].append( {'time': row['execution_unix'], 'value': row['value']})
     return rot_config
 
@@ -89,21 +97,24 @@ def process_file(file_id):
     print("Processing file:", file_id)
     packets = mdb.select_packets_by_run(file_id, SPIDs=54118)
     if not packets:
+        #print("No QL packet found in the file:{file_id}")
         return
+    print("Parsing light curves...")
     data = qla.LightCurveAnalyzer.parse(packets)
     if data is None:
         return
     unix_time = data['time']  # set to the center of a bin
     configs = get_rotating_buffer_config(unix_time[-1], unix_time[0])
     #print(data['lcs'])
-    print("Config:")
-    print(configs)
+    #print("Config:")
+    #print(configs)
     #print("start, end:", time_utils.unix2utc(unix_time[-1]), time_utils.unix2utc(unix_time[0] ))
-    lightcurve =np.sum([v for k,v in data['lcs'].items()] ,axis=0)
+    #print(data['lcs'])
+    lightcurve =np.sum([v for k,v in data['lcs'].items() if int(k) in (0,1)] ,axis=0)
     #sum counts of all energy bands
     triggers=data['triggers']
 
-    res = {'t': [], 'tbin': [], 'counts': [],  'num_tbins': [], 'time_bin_trig_sum':[]}
+    res = {'t': [], 'tbin': [], 'counts': [],  'num_tbins': [], 'time_bin_trig_sum':[],'config':configs}
     s = 0
     last_time = 0
 
@@ -120,7 +131,7 @@ def process_file(file_id):
             continue
 
         min_tbin, max_tbin, thr=get_rot_config(configs, t)
-        #print("Final settings:", min_tbin,max_tbin,thr)
+        print("Final settings:", min_tbin,max_tbin,thr)
 
         
 
@@ -128,6 +139,8 @@ def process_file(file_id):
                 or c >= thr):  # close the opening time bin anyway
             # close last time bin
             tbin = round(min([max_tbin, t - last_time]), 1)
+            #print("====================reset timebin====")
+            #print(f'case1: current_accumulated: {s}, {thr=}, current_tbin_count: {c},{tbin=}')
             res['tbin'].append(tbin)
             res['num_tbins'].append(1)
             res['t'].append([last_time, t])
@@ -139,6 +152,8 @@ def process_file(file_id):
             last_time = t
 
         if c < thr:
+            #print(f'-> {c}, {s}, {trig_sum}')
+
             s += c
             trig_sum+=tr
         else:
@@ -155,6 +170,7 @@ def process_file(file_id):
             num_tbins = min(max_bins, num_tbins) #can not greater than the maximum time bins
             tbin = round(4. / num_tbins, 1)  # time step 0.1s
 
+            #print('case2, tbin:',tbin)
             res['tbin'].append(tbin)
             res['num_tbins'].append(num_tbins) #number of timebins in 4 sec
             res['t'].append([t - 4, t])  #start time and end time
@@ -178,6 +194,12 @@ def process_file(file_id):
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print('estimate_integration_times file_id_start, file_id_end')
+    elif sys.argv[1]=='timebin':
+        current_unix = datetime.now().timestamp()
+        rows = get_rotating_buffer_config(current_unix)
+        print(rows)
+
+
     elif len(sys.argv) >= 2:
         start_id = int(sys.argv[1])
         end_id = start_id
